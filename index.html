@@ -4,39 +4,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>GPS Prototyp</title>
+    <title>GPS Äventyr</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
     <style>
-        /* Gör så att kartan fyller hela skärmen */
+        /* Grundläggande layout */
         body,
         html {
             height: 100%;
             margin: 0;
             padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            /* Förhindra scroll bouncing på mobiler */
         }
 
         #map {
             height: 100%;
             width: 100%;
+            z-index: 1;
         }
 
-        /* --- CSS FÖR DEN PULSERANDE BLÅ PUNKTEN --- */
+        /* --- UI KOMPONENTER (Glassmorphism) --- */
 
-        /* Själva kärnan av punkten */
+        /* Gemensam stil för paneler */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            padding: 15px;
+            z-index: 1000;
+            position: absolute;
+        }
+
+        /* Dashboard längst ner */
+        #dashboard {
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            text-align: center;
+        }
+
+        .stat-item h2 {
+            margin: 0;
+            font-size: 24px;
+            color: #333;
+        }
+
+        .stat-item span {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        /* Kontrollknappar uppe till höger */
+        #controls {
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: transparent;
+            box-shadow: none;
+            border: none;
+            backdrop-filter: none;
+            padding: 0;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            color: #444;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn:active {
+            transform: scale(0.90);
+        }
+
+        .btn.active {
+            background-color: #4285F4;
+            color: white;
+            box-shadow: 0 4px 15px rgba(66, 133, 244, 0.4);
+        }
+
+        /* --- KARTMARKÖRER --- */
         .blue-dot-marker {
             background-color: #4285F4;
-            /* Stark blå färg */
             border-radius: 50%;
-            border: 2px solid #fff;
-            /* Vit kant för kontrast mot kartan */
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+            border: 3px solid #fff;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
             position: relative;
         }
 
-        /* Ringen som pulserar utåt */
         .blue-dot-marker::after {
             content: '';
             position: absolute;
@@ -44,18 +127,12 @@
             left: 50%;
             transform: translate(-50%, -50%);
             width: 100%;
-            /* Startar samma storlek som punkten */
             height: 100%;
             border-radius: 50%;
-            /* En halvgenomskinlig blå ring */
-            border: 3px solid rgba(66, 133, 244, 0.7);
-            /* Starta animationen */
+            border: 1px solid rgba(66, 133, 244, 0.6);
             animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
-            opacity: 0;
-            /* Börja osynlig */
         }
 
-        /* Definiera animationen */
         @keyframes pulse-ring {
             0% {
                 width: 100%;
@@ -65,27 +142,9 @@
 
             100% {
                 width: 300%;
-                /* Väx till 3 gånger storleken */
                 height: 300%;
                 opacity: 0;
-                /* Tona ut helt */
             }
-        }
-
-        /* Statusruta för debugging (valfritt) */
-        #status-box {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
-            border-radius: 20px;
-            z-index: 1000;
-            /* Lägg ovanpå kartan */
-            font-family: sans-serif;
-            font-size: 14px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
     </style>
 </head>
@@ -94,104 +153,225 @@
 
     <div id="map"></div>
 
-    <div id="status-box">Väntar på GPS-signal...</div>
+    <!-- Kontroller -->
+    <div id="controls" class="glass-panel">
+        <button id="btn-follow" class="btn active" onclick="toggleFollow()" title="Följ mig">
+            📍
+        </button>
+        <button id="btn-save" class="btn" onclick="saveLocation()" title="Spara Plats">
+            💾
+        </button>
+        <button id="btn-clear" class="btn" onclick="clearPath()" title="Rensa Spår">
+            🧹
+        </button>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="glass-panel">
+        <div class="stat-item">
+            <h2 id="speed-val">0.0</h2>
+            <span>km/h</span>
+        </div>
+        <div class="stat-item">
+            <h2 id="alt-val">-</h2>
+            <span>Höjd (m)</span>
+        </div>
+        <div class="stat-item">
+            <h2 id="acc-val">-</h2>
+            <span>GPS (m)</span>
+        </div>
+    </div>
 
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <script>
-        // --- 1. Initiera Kartan ---
-        // Starta med en utzoomad vy över Sverige tills vi har en position
-        const map = L.map('map').setView([62.0, 15.0], 5);
+        // --- 1. Konfiguration och State ---
+        const map = L.map('map', {
+            zoomControl: false // Vi flyttar/döljer zoom-kontrollen för renare look
+        }).setView([62.0, 15.0], 5);
 
-        // Lägg till kartlager från OpenStreetMap (gratis)
+        let userMarker = null;
+        let accuracyCircle = null;
+        let pathPolyline = null;
+        let pathHistory = []; // Array av [lat, lng]
+        let isFollowing = true; // Börja med att följa användaren
+        let savedLocations = [];
+
+        // DOM Element
+        const elSpeed = document.getElementById('speed-val');
+        const elAlt = document.getElementById('alt-val');
+        const elAcc = document.getElementById('acc-val');
+        const btnFollow = document.getElementById('btn-follow');
+
+        // --- 2. Kartlager ---
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            attribution: '© OpenStreetMap',
             maxZoom: 19
         }).addTo(map);
 
-        // Variabel för att hålla koll på markören
-        let userMarker = null;
-        const statusBox = document.getElementById('status-box');
-        let firstFix = true;
+        // Skapa linjen för spårning
+        pathPolyline = L.polyline([], { color: '#FF3366', weight: 5, opacity: 0.8, lineCap: 'round' }).addTo(map);
 
-        // --- 2. Skapa den anpassade pulserande ikonen ---
-        // Vi använder L.divIcon för att kunna använda vår egen CSS
+        // Anpassad ikon för användaren
         const pulsingIcon = L.divIcon({
-            className: 'blue-dot-marker', // Vår CSS-klass
-            iconSize: [20, 20], // Storleken på själva den fasta punkten (px)
-            iconAnchor: [10, 10] // Punkten som pekar på den exakta koordinaten (mitten)
+            className: 'blue-dot-marker',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
         });
 
+        // --- 3. Hantera Sparade Platser (Persistence) ---
+        function loadSavedLocations() {
+            try {
+                const data = localStorage.getItem('gps_saved_locations');
+                if (data) {
+                    savedLocations = JSON.parse(data);
+                    savedLocations.forEach(loc => addSavedMarker(loc));
+                }
+            } catch (e) {
+                console.error("Kunde inte ladda sparade platser", e);
+            }
+        }
 
-        // --- 3. Geolocation Logik (Hög Precision) ---
-        const geoOptions = {
-            enableHighAccuracy: true, // KRITISKT för Android GPS: tvingar enheten att använda GPS-hårdvara istället för bara WiFi/mast
-            timeout: 20000,           // Ökar till 20 sekunder för att ge GPS:en mer tid att hitta satelliter
-            maximumAge: 0             // Ingen gammal cachad data, vi vill ha färsk position
+        function addSavedMarker(loc) {
+            const marker = L.marker([loc.lat, loc.lng]).addTo(map);
+            const dateStr = loc.date || "Okänt datum";
+
+            const popupContent = `
+                <div style="text-align:center">
+                    <b>Sparad Plats</b><br>
+                    <small>${dateStr}</small><br>
+                    <button onclick="removeLocation(${loc.id})" style="margin-top:5px; background:#ff4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Ta bort</button>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent);
+
+            // Spara referens till markören på objektet så vi kan ta bort den senare om vi vill (avancerat), 
+            // men för nu laddar vi bara om sidan för att "ta bort" visuellt helt korrekt i enkla versionen.
+            // Eller så kan vi implementera removeLocation.
+        }
+
+        // Global funktion för att kunna anropas från popup string
+        window.removeLocation = function (id) {
+            if (confirm("Ta bort denna plats?")) {
+                savedLocations = savedLocations.filter(l => l.id !== id);
+                localStorage.setItem('gps_saved_locations', JSON.stringify(savedLocations));
+                location.reload(); // Enkel lösning: ladda om sidan för att rensa markörer
+            }
         };
 
-        // Cirkel som visar osäkerhetsradien
-        let accuracyCircle = null;
+        function saveLocation() {
+            if (!userMarker) {
+                alert("Väntar på GPS-position...");
+                return;
+            }
+            const pos = userMarker.getLatLng();
+            const newLoc = {
+                id: Date.now(), // Unikt ID
+                lat: pos.lat,
+                lng: pos.lng,
+                date: new Date().toLocaleString('sv-SE')
+            };
+            savedLocations.push(newLoc);
+            localStorage.setItem('gps_saved_locations', JSON.stringify(savedLocations));
+            addSavedMarker(newLoc);
 
+            // Visuell feedback
+            const btn = document.getElementById('btn-save');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "✅";
+            setTimeout(() => btn.innerHTML = originalText, 1500);
+        }
+
+        function toggleFollow() {
+            isFollowing = !isFollowing;
+            if (isFollowing) {
+                btnFollow.classList.add('active');
+                if (userMarker) {
+                    map.setView(userMarker.getLatLng(), 17);
+                }
+            } else {
+                btnFollow.classList.remove('active');
+            }
+        }
+
+        function clearPath() {
+            if (confirm("Vill du rensa ditt spår?")) {
+                pathHistory = [];
+                pathPolyline.setLatLngs([]);
+            }
+        }
+
+        // --- 4. GPS Logik ---
         function success(pos) {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
-            const accuracy = pos.coords.accuracy; // Noggrannhet i meter
+            const accuracy = pos.coords.accuracy;
+            const speed = pos.coords.speed; // m/s
+            const altitude = pos.coords.altitude; // meter
 
-            // Uppdatera statusrutan med mer info
-            statusBox.innerHTML = `
-                <div>Noggrannhet: ${Math.round(accuracy)} meter</div>
-                <div style="font-size:0.8em; color:#666">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</div>
-            `;
+            const latLng = [lat, lng];
 
-            // Hantera markören (den blå punkten)
+            // 1. Uppdatera Markör
             if (!userMarker) {
-                userMarker = L.marker([lat, lng], { icon: pulsingIcon }).addTo(map);
+                userMarker = L.marker(latLng, { icon: pulsingIcon }).addTo(map);
+                if (isFollowing) {
+                    map.setView(latLng, 16); // Zooma in första gången
+                }
             } else {
-                userMarker.setLatLng([lat, lng]);
+                userMarker.setLatLng(latLng);
             }
 
-            // Hantera noggrannhetscirkeln
+            // 2. Uppdatera Cirkel
             if (!accuracyCircle) {
-                accuracyCircle = L.circle([lat, lng], {
-                    radius: accuracy,
-                    color: '#4285F4',      // Google Blue
-                    fillColor: '#4285F4',
-                    fillOpacity: 0.15,
-                    weight: 1              // Tunn kant
-                }).addTo(map);
+                accuracyCircle = L.circle(latLng, { radius: accuracy, color: '#4285F4', fillOpacity: 0.1, weight: 1 }).addTo(map);
             } else {
-                accuracyCircle.setLatLng([lat, lng]);
+                accuracyCircle.setLatLng(latLng);
                 accuracyCircle.setRadius(accuracy);
             }
 
-            // Om det är första gången vi får en position, zooma in
-            if (firstFix) {
-                // Zooma in så att hela osäkerhetscirkeln syns, men max zoom 18
-                const group = new L.featureGroup([userMarker, accuracyCircle]);
-                map.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 18 });
-                firstFix = false;
+            // 3. Uppdatera Spår
+            // Filter: Lägg bara till punkt om vi rört oss lite (minskar 'jitter' när man står still)
+            // Eller enklast: Lägg alltid till.
+            pathHistory.push(latLng);
+            // Begränsa historik om den blir för lång (prestanda), t.ex. 5000 punkter
+            if (pathHistory.length > 5000) pathHistory.shift();
+
+            pathPolyline.setLatLngs(pathHistory);
+
+            // 4. Uppdatera Dashboard
+            // Speed ge: null om stilla ibland, eller 0.
+            const speedKmh = (speed !== null && speed > 0) ? (speed * 3.6).toFixed(1) : "0.0";
+            elSpeed.innerText = speedKmh;
+
+            elAlt.innerText = altitude !== null ? Math.round(altitude) : "-";
+            elAcc.innerText = Math.round(accuracy);
+
+            // 5. Follow Mode
+            if (isFollowing) {
+                map.panTo(latLng);
             }
         }
 
         function error(err) {
-            let msg = "Kunde inte hitta position.";
-            if (err.code === 1) msg = "Åtkomst nekad. Du måste tillåta platsdata.";
-            if (err.code === 2) msg = "Position ej tillgänglig (slå på GPS).";
-            if (err.code === 3) msg = "Timeout - fick ingen signal inom 20s.";
-
-            console.warn(`ERROR(${err.code}): ${err.message}`);
-            statusBox.innerHTML = `<span style="color:red;">Fel: ${msg}</span> <br><small>Försök gå utomhus för bättre GPS-signal.</small>`;
+            console.warn(`GPS ERROR(${err.code}): ${err.message}`);
         }
 
-        // Starta övervakningen av positionen
+        // Starta allt
+        loadSavedLocations();
+
+        const geoOptions = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
         if ('geolocation' in navigator) {
-            // Använd watchPosition för kontinuerliga uppdateringar när man rör sig
             navigator.geolocation.watchPosition(success, error, geoOptions);
         } else {
-            statusBox.innerHTML = "Geolocation stöds inte av din webbläsare.";
+            alert("Tyvärr, din webbläsare verkar inte stödja Geolocation.");
         }
 
     </script>
