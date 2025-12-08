@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>GPS Äventyr</title>
 
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
@@ -16,9 +17,11 @@
             height: 100%;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
+            /* Modernare font */
             overflow: hidden;
-            /* Förhindra scroll bouncing på mobiler */
+            -webkit-font-smoothing: antialiased;
+            /* Smidigare text rendering */
         }
 
         #map {
@@ -27,96 +30,140 @@
             z-index: 1;
         }
 
-        /* --- UI KOMPONENTER (Glassmorphism) --- */
+        /* --- UI KOMPONENTER (Premium Glassmorphism) --- */
 
         /* Gemensam stil för paneler */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 16px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            padding: 15px;
+            /* Ljusare, mer translucent bakgrund */
+            background: rgba(255, 255, 255, 0.25);
+            /* Kraftigare blur för frostat glas-effekt */
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            /* Mjukare runda hörn */
+            border-radius: 24px;
+            /* Subtil vit border för "glaskant" */
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            /* Djupare skugga för lyft */
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            padding: 20px;
             z-index: 1000;
             position: absolute;
+            color: #1a1a2e;
+            /* Mörkblå/Svart text för kontrast */
         }
 
         /* Dashboard längst ner */
         #dashboard {
-            bottom: 25px;
+            bottom: 45px;
             left: 50%;
             transform: translateX(-50%);
             width: 90%;
-            max-width: 400px;
+            max-width: 380px;
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
             align-items: center;
             text-align: center;
         }
 
+        .stat-item {
+            flex: 1;
+            position: relative;
+        }
+
+        /* Separatorer mellan stats */
+        .stat-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 20%;
+            height: 60%;
+            width: 1px;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
         .stat-item h2 {
             margin: 0;
-            font-size: 24px;
-            color: #333;
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a2e;
+            /* Liten text-skugga för läsbarhet mot karta om transparensen är hög */
+            text-shadow: 0 2px 10px rgba(255, 255, 255, 0.5);
         }
 
         .stat-item span {
-            font-size: 11px;
-            color: #666;
+            font-size: 10px;
+            color: #4a4a6a;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             font-weight: 600;
+            margin-top: 4px;
+            display: block;
         }
 
         /* Kontrollknappar uppe till höger */
         #controls {
-            top: 20px;
-            right: 20px;
+            top: 25px;
+            right: 25px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 16px;
             background: transparent;
             box-shadow: none;
             border: none;
             backdrop-filter: none;
+            -webkit-backdrop-filter: none;
             padding: 0;
+            pointer-events: none;
+            /* Låt klick gå igenom containern */
         }
 
         .btn {
-            background: rgba(255, 255, 255, 0.95);
-            border: none;
-            width: 50px;
-            height: 50px;
+            /* Glas-knappar */
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(1.5px);
+            -webkit-backdrop-filter: blur(1.5px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-            font-size: 22px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            font-size: 24px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-            color: #444;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            color: #1a1a2e;
             outline: none;
             -webkit-tap-highlight-color: transparent;
+            pointer-events: auto;
+            /* Aktivera klick på knapparna */
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
         .btn:active {
-            transform: scale(0.90);
+            transform: scale(0.95);
         }
 
         .btn.active {
-            background-color: #4285F4;
+            background: rgba(217, 244, 66, 0.85);
+            /* Halv-transparent blå */
             color: white;
-            box-shadow: 0 4px 15px rgba(66, 133, 244, 0.4);
+            border: 1px solid rgba(66, 133, 244, 0.4);
+            box-shadow: 0 8px 20px rgba(66, 133, 244, 0.3);
         }
 
         /* --- KARTMARKÖRER --- */
         .blue-dot-marker {
-            background-color: #4285F4;
+            background-color: #7899cf;
             border-radius: 50%;
             border: 3px solid #fff;
-            box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
             position: relative;
         }
 
@@ -141,8 +188,8 @@
             }
 
             100% {
-                width: 300%;
-                height: 300%;
+                width: 350%;
+                height: 350%;
                 opacity: 0;
             }
         }
