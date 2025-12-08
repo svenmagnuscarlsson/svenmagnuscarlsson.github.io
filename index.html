@@ -100,32 +100,63 @@
             display: block;
         }
 
-        /* Kontrollknappar uppe till höger */
-        #controls {
+        /* --- FAB RADIAL MENU --- */
+        #fab-container {
+            position: fixed;
             top: 25px;
             right: 25px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            background: transparent;
-            box-shadow: none;
-            border: none;
-            backdrop-filter: none;
-            -webkit-backdrop-filter: none;
-            padding: 0;
-            pointer-events: none;
-            /* Låt klick gå igenom containern */
+            z-index: 1000;
         }
 
-        .btn {
-            /* Glas-knappar */
+        /* Main FAB Button */
+        .fab-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
             background: rgba(255, 255, 255, 0.35);
-            backdrop-filter: blur(1.5px);
-            -webkit-backdrop-filter: blur(1.5px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+            z-index: 1001;
+        }
+
+        .fab-icon {
+            font-size: 28px;
+            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            display: block;
+        }
+
+        .fab-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .fab-btn:active {
+            transform: scale(0.95);
+        }
+
+        .fab-btn.open .fab-icon {
+            transform: rotate(135deg);
+        }
+
+        /* Radial Menu Items */
+        .fab-item {
             width: 56px;
             height: 56px;
             border-radius: 50%;
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             font-size: 24px;
             cursor: pointer;
@@ -136,23 +167,32 @@
             color: #1a1a2e;
             outline: none;
             -webkit-tap-highlight-color: transparent;
-            pointer-events: auto;
-            /* Aktivera klick på knapparna */
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            opacity: 0;
+            transform: scale(0);
+            pointer-events: none;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
+        .fab-item.show {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .fab-item:hover {
+            transform: scale(1.1) !important;
             background: rgba(255, 255, 255, 0.5);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
-        .btn:active {
-            transform: scale(0.95);
+        .fab-item:active {
+            transform: scale(0.95) !important;
         }
 
-        .btn.active {
+        .fab-item.active {
             background: rgba(217, 244, 66, 0.85);
-            /* Halv-transparent blå */
             color: white;
             border: 1px solid rgba(66, 133, 244, 0.4);
             box-shadow: 0 8px 20px rgba(66, 133, 244, 0.3);
@@ -200,18 +240,24 @@
 
     <div id="map"></div>
 
-    <!-- Kontroller -->
-    <div id="controls" class="glass-panel">
-        <button id="btn-follow" class="btn active" onclick="toggleFollow()" title="Följ mig">
+    <!-- FAB Radial Menu -->
+    <div id="fab-container">
+        <!-- Main FAB Button -->
+        <button id="fab-main" class="fab-btn" onclick="toggleFabMenu()" title="Meny">
+            <span class="fab-icon">⚡</span>
+        </button>
+
+        <!-- Radial Menu Items (hidden by default) -->
+        <button id="btn-follow" class="fab-item active" data-index="0" onclick="toggleFollow()" title="Följ mig">
             📍
         </button>
-        <button id="btn-save" class="btn" onclick="saveLocation()" title="Spara Plats">
+        <button id="btn-save" class="fab-item" data-index="1" onclick="saveLocation()" title="Spara Plats">
             💾
         </button>
-        <button id="btn-clear" class="btn" onclick="clearPath()" title="Rensa Spår">
+        <button id="btn-clear" class="fab-item" data-index="2" onclick="clearPath()" title="Rensa Spår">
             🧹
         </button>
-        <button id="btn-wakelock" class="btn" onclick="toggleWakeLock()" title="Håll skärmen på">
+        <button id="btn-wakelock" class="fab-item" data-index="3" onclick="toggleWakeLock()" title="Håll skärmen på">
             ☀️
         </button>
     </div>
@@ -250,6 +296,7 @@
         let savedLocations = [];
         let wakeLock = null; // Screen Wake Lock
         let isWakeLockActive = false;
+        let isFabMenuOpen = false; // FAB menu state
 
         // DOM Element
         const elSpeed = document.getElementById('speed-val');
@@ -257,6 +304,8 @@
         const elAcc = document.getElementById('acc-val');
         const btnFollow = document.getElementById('btn-follow');
         const btnWakeLock = document.getElementById('btn-wakelock');
+        const fabMain = document.getElementById('fab-main');
+        const fabItems = document.querySelectorAll('.fab-item');
 
         // --- 2. Kartlager ---
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -272,6 +321,56 @@
             className: 'blue-dot-marker',
             iconSize: [20, 20],
             iconAnchor: [10, 10]
+        });
+
+        // --- FAB Menu Toggle ---
+        function toggleFabMenu() {
+            isFabMenuOpen = !isFabMenuOpen;
+
+            if (isFabMenuOpen) {
+                fabMain.classList.add('open');
+
+                // Animate items in radial pattern
+                const radius = 90; // Distance from FAB center
+                const startAngle = 180; // Start from left (West)
+                const angleStep = -30; // Go clockwise towards bottom (South)
+
+                fabItems.forEach((item, index) => {
+                    const angle = (startAngle + (index * angleStep)) * (Math.PI / 180);
+                    const x = radius * Math.cos(angle);
+                    const y = radius * Math.sin(angle);
+
+                    // Stagger the animation
+                    setTimeout(() => {
+                        item.classList.add('show');
+                        item.style.transform = `translate(${x}px, ${y}px) scale(1)`;
+                    }, index * 50);
+                });
+            } else {
+                fabMain.classList.remove('open');
+
+                // Reverse animation
+                fabItems.forEach((item, index) => {
+                    setTimeout(() => {
+                        item.classList.remove('show');
+                        item.style.transform = 'translate(0, 0) scale(0)';
+                    }, index * 30);
+                });
+            }
+        }
+
+        // Close menu when clicking on any menu item
+        function closeFabMenu() {
+            if (isFabMenuOpen) {
+                toggleFabMenu();
+            }
+        }
+
+        // Add click handlers to close menu after action
+        fabItems.forEach(item => {
+            item.addEventListener('click', () => {
+                setTimeout(closeFabMenu, 200);
+            });
         });
 
         // --- 3. Hantera Sparade Platser (Persistence) ---
