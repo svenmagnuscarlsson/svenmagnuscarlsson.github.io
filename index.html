@@ -211,6 +211,9 @@
         <button id="btn-clear" class="btn" onclick="clearPath()" title="Rensa Spår">
             🧹
         </button>
+        <button id="btn-wakelock" class="btn" onclick="toggleWakeLock()" title="Håll skärmen på">
+            ☀️
+        </button>
     </div>
 
     <!-- Dashboard -->
@@ -245,12 +248,15 @@
         let pathHistory = []; // Array av [lat, lng]
         let isFollowing = true; // Börja med att följa användaren
         let savedLocations = [];
+        let wakeLock = null; // Screen Wake Lock
+        let isWakeLockActive = false;
 
         // DOM Element
         const elSpeed = document.getElementById('speed-val');
         const elAlt = document.getElementById('alt-val');
         const elAcc = document.getElementById('acc-val');
         const btnFollow = document.getElementById('btn-follow');
+        const btnWakeLock = document.getElementById('btn-wakelock');
 
         // --- 2. Kartlager ---
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -350,6 +356,56 @@
                 pathPolyline.setLatLngs([]);
             }
         }
+
+        // --- Wake Lock Funktion ---
+        async function toggleWakeLock() {
+            if (!('wakeLock' in navigator)) {
+                alert('Din webbläsare stöder inte Screen Wake Lock API. Prova en nyare version av Chrome, Edge eller Safari.');
+                return;
+            }
+
+            try {
+                if (isWakeLockActive && wakeLock) {
+                    // Stäng av wake lock
+                    await wakeLock.release();
+                    wakeLock = null;
+                    isWakeLockActive = false;
+                    btnWakeLock.classList.remove('active');
+                    console.log('Wake Lock inaktiverad');
+                } else {
+                    // Aktivera wake lock
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    isWakeLockActive = true;
+                    btnWakeLock.classList.add('active');
+                    console.log('Wake Lock aktiverad');
+
+                    // Lyssna på när wake lock släpps (t.ex. när användaren byter flik)
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock släpptes');
+                        isWakeLockActive = false;
+                        btnWakeLock.classList.remove('active');
+                    });
+                }
+            } catch (err) {
+                console.error(`Wake Lock fel: ${err.name}, ${err.message}`);
+                alert(`Kunde inte aktivera skärmlås: ${err.message}`);
+            }
+        }
+
+        // Återaktivera wake lock när sidan blir synlig igen (om användaren hade det aktiverat)
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    isWakeLockActive = true;
+                    btnWakeLock.classList.add('active');
+                    console.log('Wake Lock återaktiverad');
+                } catch (err) {
+                    console.error(`Kunde inte återaktivera Wake Lock: ${err}`);
+                }
+            }
+        });
+
 
         // --- 4. GPS Logik ---
         function success(pos) {
